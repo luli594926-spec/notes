@@ -2672,11 +2672,11 @@ class InteractionController(
     private fun beginCarry() {
         val selected = selection.map { it.item }
         val out = ArrayList<Pair<Int, Carry>>()
-        for ((pi, sels) in selection.groupBy { it.pageIndex }) {
-            val page = state.document.pages.getOrNull(pi) ?: continue
-            val c = Carry.of(sels.map { it.item }, page.items, selected)
-            if (!c.isEmpty) out += pi to c
-        }
+//        for ((pi, sels) in selection.groupBy { it.pageIndex }) {
+//            val page = state.document.pages.getOrNull(pi) ?: continue
+//            val c = Carry.of(sels.map { it.item }, page.items, selected)
+//            if (!c.isEmpty) out += pi to c
+//        }
         carries = out
         carried = out.flatMapTo(HashSet()) { it.second.items }
         carriedFrom = out.map { (_, c) -> c.items.map { it.paintBounds() }.reduce { a, b -> a.union(b) } }

@@ -50,7 +50,7 @@
 - **20+ page templates**: Cornell, planners, music staves, isometric and more.
 - **Endless themes**: any accent colour, eight styles for each, dual tone and Material You.
 - **Make it yours**: rearrange the toolbar, float it or dock it on any edge, and pick its size.
-- **Split view**: two notes side by side.
+- [**Split view**](./docs/split-view.md): two notes side by side.
 - **A real file explorer**: grid, gallery, list, column and timeline views, with plenty to customise.
 - **Your notes, your folders**: notes are saved as files in a folder you choose, not locked away in an app's database, so you stay in full control of them.
 - **Works with stylus pens**: S Pen and many others.
