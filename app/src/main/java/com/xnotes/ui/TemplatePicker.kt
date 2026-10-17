@@ -307,8 +307,6 @@ internal fun CustomImageStrip(
                         if (bitmap != null) Image(bitmap, contentDescription = entry.name, modifier = Modifier.size(THUMB_W, thumbH), contentScale = ContentScale.Crop)
                         else Box(Modifier.size(THUMB_W, thumbH).background(paper.toComposeColor()), contentAlignment = Alignment.Center) { Text("?", color = palette.textDim.toComposeColor()) }
                     }
-                    Spacer(Modifier.height(3.dp))
-                    Text(CustomAssetFolders.displayName(entry.name), color = palette.text.toComposeColor(), fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                 }
             }
         }
