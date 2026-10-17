@@ -503,7 +503,7 @@ fun MarginsPopup(editor: Editor, onDismiss: () -> Unit) {
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TemplateParamControls(
+internal fun TemplateParamControls(
     t: com.xnotes.core.template.Template,
     style: PageStyle,
     lower: PageStyle?,

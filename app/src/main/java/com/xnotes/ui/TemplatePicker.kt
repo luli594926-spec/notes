@@ -2,6 +2,7 @@ package com.xnotes.ui
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -36,11 +38,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,8 +55,12 @@ import com.xnotes.core.model.Rgba
 import com.xnotes.core.template.Template
 import com.xnotes.core.template.TemplatePage
 import com.xnotes.core.template.TemplatePainter
+import com.xnotes.core.template.TemplateLayer
+import com.xnotes.core.template.TemplateOutput
+import com.xnotes.core.template.TPrim
 import com.xnotes.core.template.TemplateValues
 import com.xnotes.platform.AndroidRenderer
+import com.xnotes.platform.CustomAssetFolders
 import com.xnotes.platform.TemplateLibrary
 import com.xnotes.ui.theme.LocalPalette
 import com.xnotes.ui.theme.toComposeColor
@@ -67,8 +75,8 @@ internal object TemplateLibraryUi {
     var version by mutableIntStateOf(0)
 }
 
-private val THUMB_W = 52.dp
-private val TILE_W = 62.dp
+private val THUMB_W = 102.dp
+private val TILE_W = 108.dp
 
 /**
  * A row of template previews drawn at the current page's proportions, the [selected] one outlined,
@@ -94,7 +102,7 @@ internal fun TemplateStrip(
     val thumbH = THUMB_W * aspect.toFloat()
     val wPx = thumbPx(THUMB_W)
     // Not a LazyRow: the popup measures its content's intrinsic size, which lazy lists refuse.
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         for (e in entries) key(e.key) {
             var menu by remember { mutableStateOf(false) }
             Column(
@@ -110,6 +118,18 @@ internal fun TemplateStrip(
                     .padding(vertical = 3.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                // Reserve two lines for every title so longer names never shift previews.
+                Box(Modifier.width(TILE_W).height(36.dp), contentAlignment = Alignment.Center) {
+                    Text(
+                        e.template.name,
+                        color = palette.text.toComposeColor(),
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                }
                 val sel = e.key == selected
                 Box(
                     Modifier
@@ -121,14 +141,6 @@ internal fun TemplateStrip(
                     if (bmp != null) Image(bmp, contentDescription = e.template.name, Modifier.size(THUMB_W, thumbH))
                 }
                 Spacer(Modifier.height(3.dp))
-                Text(
-                    e.template.name,
-                    color = palette.text.toComposeColor(),
-                    fontSize = 9.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                )
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     if (e.source == TemplateLibrary.Source.IMPORTED) {
                         DropdownMenuItem(text = { Text(stringResource(R.string.remove_template)) }, onClick = { menu = false; onRemove(e.key) })
@@ -146,6 +158,9 @@ internal fun TemplateStrip(
                 .padding(vertical = 3.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Box(Modifier.width(TILE_W).height(36.dp), contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.import_template), color = palette.text.toComposeColor(), fontSize = 11.sp)
+            }
             Box(
                 Modifier
                     .size(THUMB_W, thumbH)
@@ -156,12 +171,133 @@ internal fun TemplateStrip(
                 Text("+", color = palette.textDim.toComposeColor(), fontSize = 20.sp)
             }
             Spacer(Modifier.height(3.dp))
+        }
+    }
+}
+
+/**
+ * Show a legible preview and metadata for the selected template, then expose only the controls
+ * declared by that template. The values are stored on the selected page/cover style, not applied
+ * to an open note, and both creation tabs have independent state.
+ */
+@Composable
+internal fun CreationTemplateSettings(
+    entry: TemplateLibrary.Entry?,
+    style: PageStyle,
+    pageMm: Pair<Double, Double>,
+    ink: Rgba,
+    accent: Rgba,
+    paper: Rgba,
+    onChange: (PageStyle) -> Unit,
+) {
+    if (entry == null) return
+    val palette = LocalPalette.current
+    val template = entry.template
+    var customizing by remember(entry.key) { mutableStateOf(false) }
+    val numbers = HashMap(style.params ?: emptyMap())
+    template.spacingParam?.let { spacing ->
+        style.spacing?.let { numbers[spacing.name] = it * 25.4 / com.xnotes.core.model.PageSize.DEFAULT_DPI }
+    }
+    val previewInk = style.patternColor ?: ink
+    val previewAccent = style.accentColor ?: accent
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        TemplatePreview(
+            template, entry.key, pageMm, previewInk, previewAccent, paper,
+            TemplateValues(numbers, style.colors ?: emptyMap()), 112.dp,
+        )
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text(
-                stringResource(R.string.import_template),
+                template.name,
                 color = palette.text.toComposeColor(),
-                fontSize = 9.sp,
-                maxLines = 1,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
+            template.description?.takeIf { it.isNotBlank() }?.let { description ->
+                Text(
+                    description,
+                    color = palette.textDim.toComposeColor(),
+                    fontSize = 11.sp,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (template.params.isNotEmpty()) {
+                ModeChip(stringResource(R.string.create_template_settings), customizing) {
+                    customizing = !customizing
+                }
+            }
+        }
+    }
+    if (customizing && template.params.isNotEmpty()) {
+        TemplateParamControls(
+            template, style, lower = null,
+            dpi = com.xnotes.core.model.PageSize.DEFAULT_DPI,
+            apply = onChange,
+        )
+    }
+}
+
+/** Image-backed custom page/cover patterns, rendered as page-shaped thumbnails like template presets. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun CustomImageStrip(
+    images: List<CustomAssetFolders.CustomImage>,
+    selectedBytes: ByteArray?,
+    pageMm: Pair<Double, Double>,
+    paper: Rgba,
+    onSelect: (ByteArray) -> Unit,
+    onImport: () -> Unit,
+    onClear: () -> Unit,
+) {
+    val palette = LocalPalette.current
+    val aspect = (pageMm.second / pageMm.first).coerceIn(0.5, 2.0)
+    val thumbH = THUMB_W * aspect.toFloat()
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (selectedBytes != null) {
+            Column(
+                Modifier.width(TILE_W).clip(MaterialTheme.shapes.extraSmall).combinedClickable(onClick = onClear).padding(vertical = 3.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(Modifier.size(THUMB_W, thumbH).border(1.dp, palette.accent.toComposeColor(), RoundedCornerShape(3.dp)).background(paper.toComposeColor(), RoundedCornerShape(3.dp)), contentAlignment = Alignment.Center) {
+                    Text("×", color = palette.textDim.toComposeColor(), fontSize = 20.sp)
+                }
+                Spacer(Modifier.height(3.dp))
+                Text(stringResource(R.string.none), color = palette.text.toComposeColor(), fontSize = 9.sp, maxLines = 1)
+            }
+        }
+        images.forEach { entry ->
+            key(entry.id) {
+                val selected = selectedBytes?.contentEquals(entry.bytes) == true
+                val bitmap = remember(entry.id) { BitmapFactory.decodeByteArray(entry.bytes, 0, entry.bytes.size)?.asImageBitmap() }
+                Column(
+                    Modifier.width(TILE_W).clip(MaterialTheme.shapes.extraSmall)
+                        .combinedClickable(onClick = { onSelect(entry.bytes) }).padding(vertical = 3.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(Modifier.size(THUMB_W, thumbH).border(if (selected) 2.dp else 1.dp, (if (selected) palette.accent else palette.border).toComposeColor(), RoundedCornerShape(3.dp)).padding(if (selected) 2.dp else 1.dp)) {
+                        if (bitmap != null) Image(bitmap, contentDescription = entry.name, modifier = Modifier.size(THUMB_W, thumbH), contentScale = ContentScale.Crop)
+                        else Box(Modifier.size(THUMB_W, thumbH).background(paper.toComposeColor()), contentAlignment = Alignment.Center) { Text("?", color = palette.textDim.toComposeColor()) }
+                    }
+                    Spacer(Modifier.height(3.dp))
+                    Text(entry.name.substringBeforeLast('.', entry.name), color = palette.text.toComposeColor(), fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                }
+            }
+        }
+        Column(
+            Modifier.width(TILE_W).clip(MaterialTheme.shapes.extraSmall).combinedClickable(onClick = onImport).padding(vertical = 3.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(Modifier.size(THUMB_W, thumbH).border(1.dp, palette.border.toComposeColor(), RoundedCornerShape(3.dp)).background(palette.surface.toComposeColor(), RoundedCornerShape(3.dp)), contentAlignment = Alignment.Center) {
+                Text("+", color = palette.textDim.toComposeColor(), fontSize = 20.sp)
+            }
+            Spacer(Modifier.height(3.dp))
+            Text(stringResource(R.string.create_import_image), color = palette.text.toComposeColor(), fontSize = 9.sp, maxLines = 1)
         }
     }
 }
@@ -219,9 +355,43 @@ internal object TemplateThumbs {
 
     /** Thumbnails show the ruling plainly, whatever opacity the page itself uses. */
     fun spec(key: String, pageMm: Pair<Double, Double>, ink: Rgba, accent: Rgba, paper: Rgba, values: TemplateValues, wPx: Int) =
-        Spec(key, pageMm, ink.copy(a = max(ink.a, 170)), accent.copy(a = max(accent.a, 190)), paper, values.numbers, values.colors, wPx)
+        Spec(key, pageMm, ink.copy(a = max(ink.a, 225)), accent.copy(a = max(accent.a, 225)), paper, values.numbers, values.colors, wPx)
 
     fun cached(s: Spec): ImageBitmap? = synchronized(cache) { cache[s] }
+
+    /**
+     * At picker scale most ordinary paper rulings become sub-pixel (the built-in 0.254 mm
+     * stroke becomes roughly 0.2 px). Boost their *preview geometry* so lines, dots and
+     * grids remain identifiable; do not change the template's real page/PDF rendering.
+     */
+    internal fun legiblePreview(out: TemplateOutput, scale: Double): TemplateOutput {
+        if (scale <= 0.0) return out
+        val minStroke = 0.95 / scale
+        val minDotRadius = 0.75 / scale
+        return TemplateOutput(out.layers.map { layer ->
+            TemplateLayer(layer.color, layer.prims.map { primitive ->
+                when (primitive) {
+                    is TPrim.Stroke -> TPrim.Stroke(
+                        primitive.pts, primitive.closed, max(primitive.width, minStroke),
+                        primitive.dashOn, primitive.dashOff,
+                    )
+                    is TPrim.Ellipse -> when {
+                        !primitive.fill -> TPrim.Ellipse(
+                            primitive.cx, primitive.cy, primitive.rx, primitive.ry, false,
+                            max(primitive.width, minStroke), primitive.dashOn, primitive.dashOff,
+                        )
+                        primitive.rx * scale < 0.75 && primitive.ry * scale < 0.75 -> TPrim.Ellipse(
+                            primitive.cx, primitive.cy,
+                            max(primitive.rx, minDotRadius), max(primitive.ry, minDotRadius),
+                            true, primitive.width, primitive.dashOn, primitive.dashOff,
+                        )
+                        else -> primitive
+                    }
+                    is TPrim.Fill, is TPrim.FillRect -> primitive
+                }
+            })
+        })
+    }
 
     fun render(t: Template, s: Spec, keep: Boolean): ImageBitmap? {
         if (keep) cached(s)?.let { return it }
@@ -233,7 +403,11 @@ internal object TemplateThumbs {
             c.drawColor(s.paper.toArgb())
             val values = TemplateValues(s.numbers, s.colors)
             val out = TemplateLibrary.layouts.layout(t, TemplatePage(w, h, Rect(0.0, 0.0, w, h), s.ink, s.accent, values))
-            TemplatePainter.paint(AndroidRenderer(c), out, s.wPx / w, Rect(0.0, 0.0, s.wPx.toDouble(), hPx.toDouble()))
+            val scale = s.wPx / w
+            TemplatePainter.paint(
+                AndroidRenderer(c), legiblePreview(out, scale), scale,
+                Rect(0.0, 0.0, s.wPx.toDouble(), hPx.toDouble()),
+            )
             bmp.asImageBitmap()
         }.getOrNull() ?: return null
         if (keep) synchronized(cache) { cache[s] = img }

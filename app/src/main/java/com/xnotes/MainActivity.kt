@@ -490,6 +490,45 @@ private fun EditorScreen(
         }
     }
 
+    // The note-creation dialog reuses the same template import path as the editor's template picker.
+    val pickCreationCoverLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { resolver.openInputStream(uri)?.use { it.readBytes() } }
+                .onSuccess { bytes ->
+                    if (bytes != null) {
+                        editor.noteCreationCoverImageBytes = bytes
+                        val root = editor.browseRoot
+                        val name = displayNameOf(resolver, uri)
+                        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            if (com.xnotes.platform.CustomAssetFolders.storeImage(context, root, bytes, name, com.xnotes.platform.CustomAssetFolders.Kind.COVER)) {
+                                editor.customAssetsChanged()
+                            }
+                        }
+                    } else editor.message = context.getString(R.string.err_read_image)
+                }
+                .onFailure { editor.message = context.getString(R.string.err_read_image) }
+        }
+    }
+
+    val pickCreationPageImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { resolver.openInputStream(uri)?.use { it.readBytes() } }
+                .onSuccess { bytes ->
+                    if (bytes != null) {
+                        editor.noteCreationPageImageBytes = bytes
+                        val root = editor.browseRoot
+                        val name = displayNameOf(resolver, uri)
+                        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                            if (com.xnotes.platform.CustomAssetFolders.storeImage(context, root, bytes, name, com.xnotes.platform.CustomAssetFolders.Kind.PAGE)) {
+                                editor.customAssetsChanged()
+                            }
+                        }
+                    } else editor.message = context.getString(R.string.err_read_image)
+                }
+                .onFailure { editor.message = context.getString(R.string.err_read_image) }
+        }
+    }
+
     // A user font (.ttf/.otf), stored + registered by the editor.
     val importFontLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -833,6 +872,9 @@ private fun EditorScreen(
                 onExitApp = { (context as? android.app.Activity)?.finish() },
                 onImportCodeTheme = { importCodeThemeLauncher.launch(arrayOf("*/*")) },
                 onImportFont = { importFontLauncher.launch(arrayOf("*/*")) },
+                onImportTemplate = { importTemplateLauncher.launch(arrayOf("*/*")) },
+                onPickCoverImage = { pickCreationCoverLauncher.launch(arrayOf("image/*")) },
+                onPickPageImage = { pickCreationPageImageLauncher.launch(arrayOf("image/*")) },
                 onImportPdf = { importPdfLauncher.launch(arrayOf("application/pdf")) },
                 onOpenFile = { uri -> guarded(editor) { openTreeFile(uri) } },
                 onPickRoot = { pickRootLauncher.launch(null) },
