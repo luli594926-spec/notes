@@ -1016,6 +1016,8 @@
     <string name="create_custom_page_patterns">Custom page patterns</string>
     <string name="create_custom_cover_patterns">Custom cover patterns</string>
     <string name="create_import_image">Import image</string>
+    <string name="create_images_imported">Imported %1$d images (%2$d not saved).</string>
+    <string name="create_images_not_saved">Could not save images to the custom asset library. Check the selected notes folder.</string>
     <string name="create_save_as_default_help">Use this page style for notes created later.</string>
     <string name="create_custom_page_templates">Imported page templates</string>
     <string name="create_custom_cover_templates">Imported cover templates</string>

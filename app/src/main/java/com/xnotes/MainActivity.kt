@@ -490,43 +490,56 @@ private fun EditorScreen(
         }
     }
 
-    // The note-creation dialog reuses the same template import path as the editor's template picker.
-    val pickCreationCoverLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            runCatching { resolver.openInputStream(uri)?.use { it.readBytes() } }
-                .onSuccess { bytes ->
-                    if (bytes != null) {
-                        editor.noteCreationCoverImageBytes = bytes
-                        val root = editor.browseRoot
-                        val name = displayNameOf(resolver, uri)
-                        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                            if (com.xnotes.platform.CustomAssetFolders.storeImage(context, root, bytes, name, com.xnotes.platform.CustomAssetFolders.Kind.COVER)) {
-                                editor.customAssetsChanged()
-                            }
-                        }
-                    } else editor.message = context.getString(R.string.err_read_image)
+    // Both asset pickers accept batches, but only the first readable image is selected
+    // for the new note. All readable images are saved in the corresponding library.
+    fun importCreationImages(uris: List<Uri>, kind: com.xnotes.platform.CustomAssetFolders.Kind) {
+        if (uris.isEmpty()) return
+        scope.launch {
+            val root = editor.browseRoot
+            val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                var selected: ByteArray? = null
+                var imported = 0
+                var failed = 0
+                for (uri in uris) {
+                    val bytes = runCatching { resolver.openInputStream(uri)?.use { it.readBytes() } }
+                        .getOrNull()?.takeIf { it.isNotEmpty() }
+                    if (bytes == null) {
+                        failed++
+                        continue
+                    }
+                    if (selected == null) selected = bytes
+                    val name = displayNameOf(resolver, uri)
+                    if (com.xnotes.platform.CustomAssetFolders.storeImage(context, root, bytes, name, kind)) {
+                        imported++
+                    } else {
+                        failed++
+                    }
                 }
-                .onFailure { editor.message = context.getString(R.string.err_read_image) }
+                Triple(selected, imported, failed)
+            }
+            val (selected, imported, failed) = result
+            if (selected != null) {
+                if (kind == com.xnotes.platform.CustomAssetFolders.Kind.COVER) {
+                    editor.noteCreationCoverImageBytes = selected
+                } else {
+                    editor.noteCreationPageImageBytes = selected
+                }
+            }
+            if (imported > 0) editor.customAssetsChanged()
+            editor.message = when {
+                imported > 0 -> context.getString(R.string.create_images_imported, imported, failed)
+                selected == null -> context.getString(R.string.err_read_image)
+                else -> context.getString(R.string.create_images_not_saved)
+            }
         }
     }
 
-    val pickCreationPageImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            runCatching { resolver.openInputStream(uri)?.use { it.readBytes() } }
-                .onSuccess { bytes ->
-                    if (bytes != null) {
-                        editor.noteCreationPageImageBytes = bytes
-                        val root = editor.browseRoot
-                        val name = displayNameOf(resolver, uri)
-                        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                            if (com.xnotes.platform.CustomAssetFolders.storeImage(context, root, bytes, name, com.xnotes.platform.CustomAssetFolders.Kind.PAGE)) {
-                                editor.customAssetsChanged()
-                            }
-                        }
-                    } else editor.message = context.getString(R.string.err_read_image)
-                }
-                .onFailure { editor.message = context.getString(R.string.err_read_image) }
-        }
+    val pickCreationCoverLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        importCreationImages(uris, com.xnotes.platform.CustomAssetFolders.Kind.COVER)
+    }
+
+    val pickCreationPageImageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        importCreationImages(uris, com.xnotes.platform.CustomAssetFolders.Kind.PAGE)
     }
 
     // A user font (.ttf/.otf), stored + registered by the editor.
