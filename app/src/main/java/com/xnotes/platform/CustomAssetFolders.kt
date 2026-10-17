@@ -35,6 +35,42 @@ object CustomAssetFolders {
         }.getOrDefault(false)
     }
 
+    /** Remove only a file that still belongs to the requested custom-image folder. */
+    fun deleteImage(context: Context, treeUri: String?, kind: Kind, documentId: String): Boolean {
+        if (treeUri.isNullOrBlank() || documentId.isBlank()) return false
+        return runCatching {
+            val resolver = context.applicationContext.contentResolver
+            val tree = Uri.parse(treeUri)
+            val rootId = DocumentsContract.getTreeDocumentId(tree)
+            val pagesId = childId(context, tree, rootId, ROOT_DIR) ?: return false
+            val kindId = childId(context, tree, pagesId, kind.folder) ?: return false
+            val children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, kindId)
+            var belongsToLibrary = false
+            resolver.query(
+                children,
+                arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_MIME_TYPE),
+                null, null, null,
+            )?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    if (cursor.getString(0) == documentId &&
+                        cursor.getString(1) != DocumentsContract.Document.MIME_TYPE_DIR
+                    ) {
+                        belongsToLibrary = true
+                        break
+                    }
+                }
+            }
+            if (!belongsToLibrary) return false
+            DocumentsContract.deleteDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, documentId))
+        }.getOrDefault(false)
+    }
+
+    /** Hide the import timestamp from thumbnail captions without renaming stored files. */
+    fun displayName(fileName: String): String {
+        val stem = fileName.substringBeforeLast('.', fileName)
+        return stem.replace(Regex("-[0-9]{13}$"), "")
+    }
+
     /** Read the selected kind's image library from the granted notes folder. */
     fun loadImages(context: Context, treeUri: String?, kind: Kind): List<CustomImage> {
         if (treeUri.isNullOrBlank()) return emptyList()

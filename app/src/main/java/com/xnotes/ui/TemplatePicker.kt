@@ -21,10 +21,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -254,8 +256,26 @@ internal fun CustomImageStrip(
     onSelect: (ByteArray) -> Unit,
     onImport: () -> Unit,
     onClear: () -> Unit,
+    onDelete: (CustomAssetFolders.CustomImage) -> Unit,
 ) {
     val palette = LocalPalette.current
+    var pendingDelete by remember { mutableStateOf<CustomAssetFolders.CustomImage?>(null) }
+    pendingDelete?.let { entry ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text(stringResource(R.string.delete_confirm_title)) },
+            text = { Text(stringResource(R.string.create_delete_asset_confirm, CustomAssetFolders.displayName(entry.name))) },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingDelete = null
+                    onDelete(entry)
+                }) { Text(stringResource(R.string.delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
     val aspect = (pageMm.second / pageMm.first).coerceIn(0.5, 2.0)
     val thumbH = THUMB_W * aspect.toFloat()
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -277,7 +297,10 @@ internal fun CustomImageStrip(
                 val bitmap = remember(entry.id) { BitmapFactory.decodeByteArray(entry.bytes, 0, entry.bytes.size)?.asImageBitmap() }
                 Column(
                     Modifier.width(TILE_W).clip(MaterialTheme.shapes.extraSmall)
-                        .combinedClickable(onClick = { onSelect(entry.bytes) }).padding(vertical = 3.dp),
+                        .combinedClickable(
+                            onClick = { onSelect(entry.bytes) },
+                            onLongClick = { pendingDelete = entry },
+                        ).padding(vertical = 3.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box(Modifier.size(THUMB_W, thumbH).border(if (selected) 2.dp else 1.dp, (if (selected) palette.accent else palette.border).toComposeColor(), RoundedCornerShape(3.dp)).padding(if (selected) 2.dp else 1.dp)) {
@@ -285,7 +308,7 @@ internal fun CustomImageStrip(
                         else Box(Modifier.size(THUMB_W, thumbH).background(paper.toComposeColor()), contentAlignment = Alignment.Center) { Text("?", color = palette.textDim.toComposeColor()) }
                     }
                     Spacer(Modifier.height(3.dp))
-                    Text(entry.name.substringBeforeLast('.', entry.name), color = palette.text.toComposeColor(), fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+                    Text(CustomAssetFolders.displayName(entry.name), color = palette.text.toComposeColor(), fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                 }
             }
         }

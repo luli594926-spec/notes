@@ -2182,6 +2182,7 @@ private fun NoteCreationDialog(
     onDismiss: () -> Unit,
 ) {
     val palette = LocalPalette.current
+    val scope = rememberCoroutineScope()
     var text by remember { mutableStateOf(TextFieldValue(initial, selection = TextRange(0, initial.length))) }
     var pageSize by remember { mutableStateOf(editor.defaultNewPageSize) }
     var orientation by remember { mutableStateOf(editor.defaultNewPageOrientation) }
@@ -2385,6 +2386,23 @@ private fun NoteCreationDialog(
                     },
                     onImport = onPickPageImage,
                     onClear = { pageImageBytes = null; editor.noteCreationPageImageBytes = null },
+                    onDelete = { entry ->
+                        scope.launch {
+                            val deleted = withContext(Dispatchers.IO) {
+                                com.xnotes.platform.CustomAssetFolders.deleteImage(
+                                    context, editor.browseRoot,
+                                    com.xnotes.platform.CustomAssetFolders.Kind.PAGE, entry.id,
+                                )
+                            }
+                            if (deleted) {
+                                if (pageImageBytes?.contentEquals(entry.bytes) == true) {
+                                    pageImageBytes = null
+                                    editor.noteCreationPageImageBytes = null
+                                }
+                                editor.customAssetsChanged()
+                            } else editor.message = context.getString(R.string.create_delete_asset_failed)
+                        }
+                    },
                 )
                 }
                     } else {
@@ -2456,6 +2474,23 @@ private fun NoteCreationDialog(
                         },
                         onImport = onPickCoverImage,
                         onClear = { coverImageBytes = null; editor.noteCreationCoverImageBytes = null },
+                        onDelete = { entry ->
+                            scope.launch {
+                                val deleted = withContext(Dispatchers.IO) {
+                                    com.xnotes.platform.CustomAssetFolders.deleteImage(
+                                        context, editor.browseRoot,
+                                        com.xnotes.platform.CustomAssetFolders.Kind.COVER, entry.id,
+                                    )
+                                }
+                                if (deleted) {
+                                    if (coverImageBytes?.contentEquals(entry.bytes) == true) {
+                                        coverImageBytes = null
+                                        editor.noteCreationCoverImageBytes = null
+                                    }
+                                    editor.customAssetsChanged()
+                                } else editor.message = context.getString(R.string.create_delete_asset_failed)
+                            }
+                        },
                     )
                     }
                 }
