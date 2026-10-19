@@ -2190,6 +2190,9 @@ private fun NoteCreationDialog(
     var appearanceTab by remember { mutableStateOf(0) }
     var pageSourceTab by remember { mutableStateOf(if (editor.noteCreationPageImageBytes == null) 0 else 1) }
     var coverSourceTab by remember { mutableStateOf(if (editor.noteCreationCoverImageBytes == null) 0 else 1) }
+    var pageTemplateGroup by remember { mutableStateOf(0) }
+    // Covers should show the user's designs first; built-in rulings remain one tap away.
+    var coverTemplateGroup by remember { mutableStateOf(1) }
     var pageTemplateStyle by remember { mutableStateOf(editor.newNoteStyle) }
     var coverTemplateStyle by remember { mutableStateOf(PageStyle()) }
     var includeCover by remember { mutableStateOf(false) }
@@ -2227,6 +2230,16 @@ private fun NoteCreationDialog(
     }
     val templateVersion = TemplateLibraryUi.version
     val availableTemplates = TemplateLibrary.all()
+    // Explicit cover/page tags keep imported designs in the appropriate creation tab.
+    // Untagged templates remain usable in either context for backwards compatibility.
+    val pageTemplates = availableTemplates.filter { entry ->
+        entry.source != TemplateLibrary.Source.IMPORTED ||
+            entry.template.tags.none { it.equals("cover", ignoreCase = true) || it.equals("covers", ignoreCase = true) }
+    }
+    val coverTemplates = availableTemplates.filter { entry ->
+        entry.source != TemplateLibrary.Source.IMPORTED ||
+            entry.template.tags.none { it.equals("page", ignoreCase = true) || it.equals("pages", ignoreCase = true) }
+    }
     val context = LocalContext.current
     val customPageImages by produceState(
         initialValue = emptyList<com.xnotes.platform.CustomAssetFolders.CustomImage>(),
@@ -2345,8 +2358,15 @@ private fun NoteCreationDialog(
                     ModeChip(stringResource(R.string.create_image_source), pageSourceTab == 1) { pageSourceTab = 1 }
                 }
                 if (pageSourceTab == 0) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    ModeChip(stringResource(R.string.create_builtin_templates), pageTemplateGroup == 0) { pageTemplateGroup = 0 }
+                    ModeChip(stringResource(R.string.create_imported_templates), pageTemplateGroup == 1) { pageTemplateGroup = 1 }
+                }
                 TemplateStrip(
-                    entries = availableTemplates,
+                    entries = pageTemplates.filter {
+                        if (pageTemplateGroup == 0) it.source == TemplateLibrary.Source.BUILT_IN || it.source == TemplateLibrary.Source.BUNDLED
+                        else it.source == TemplateLibrary.Source.IMPORTED || it.source == TemplateLibrary.Source.NOTE
+                    },
                     selected = pagePattern,
                     pageMm = pageMm,
                     ink = pageTemplateStyle.patternColor ?: Rgba(70, 70, 70),
@@ -2434,8 +2454,15 @@ private fun NoteCreationDialog(
                         ModeChip(stringResource(R.string.create_image_source), coverSourceTab == 1) { coverSourceTab = 1 }
                     }
                     if (coverSourceTab == 0) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ModeChip(stringResource(R.string.create_imported_templates), coverTemplateGroup == 1) { coverTemplateGroup = 1 }
+                        ModeChip(stringResource(R.string.create_builtin_templates), coverTemplateGroup == 0) { coverTemplateGroup = 0 }
+                    }
                     TemplateStrip(
-                        entries = availableTemplates,
+                        entries = coverTemplates.filter {
+                            if (coverTemplateGroup == 0) it.source == TemplateLibrary.Source.BUILT_IN || it.source == TemplateLibrary.Source.BUNDLED
+                            else it.source == TemplateLibrary.Source.IMPORTED || it.source == TemplateLibrary.Source.NOTE
+                        },
                         selected = coverPattern,
                         pageMm = pageMm,
                         ink = coverTemplateStyle.patternColor ?: Rgba(245, 245, 245),
