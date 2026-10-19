@@ -2193,6 +2193,8 @@ private fun NoteCreationDialog(
     var pageTemplateGroup by remember { mutableStateOf(0) }
     // Covers should show the user's designs first; built-in rulings remain one tap away.
     var coverTemplateGroup by remember { mutableStateOf(1) }
+    var pageTemplateTag by remember { mutableStateOf("") }
+    var coverTemplateTag by remember { mutableStateOf("") }
     var pageTemplateStyle by remember { mutableStateOf(editor.newNoteStyle) }
     var coverTemplateStyle by remember { mutableStateOf(PageStyle()) }
     var includeCover by remember { mutableStateOf(false) }
@@ -2239,6 +2241,14 @@ private fun NoteCreationDialog(
     val coverTemplates = availableTemplates.filter { entry ->
         entry.source != TemplateLibrary.Source.IMPORTED ||
             entry.template.tags.none { it.equals("page", ignoreCase = true) || it.equals("pages", ignoreCase = true) }
+    }
+    val pageGroupTemplates = pageTemplates.filter {
+        if (pageTemplateGroup == 0) it.source == TemplateLibrary.Source.BUILT_IN || it.source == TemplateLibrary.Source.BUNDLED
+        else it.source == TemplateLibrary.Source.IMPORTED || it.source == TemplateLibrary.Source.NOTE
+    }
+    val coverGroupTemplates = coverTemplates.filter {
+        if (coverTemplateGroup == 0) it.source == TemplateLibrary.Source.BUILT_IN || it.source == TemplateLibrary.Source.BUNDLED
+        else it.source == TemplateLibrary.Source.IMPORTED || it.source == TemplateLibrary.Source.NOTE
     }
     val context = LocalContext.current
     val customPageImages by produceState(
@@ -2359,14 +2369,16 @@ private fun NoteCreationDialog(
                 }
                 if (pageSourceTab == 0) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    ModeChip(stringResource(R.string.create_builtin_templates), pageTemplateGroup == 0) { pageTemplateGroup = 0 }
-                    ModeChip(stringResource(R.string.create_imported_templates), pageTemplateGroup == 1) { pageTemplateGroup = 1 }
+                    ModeChip(stringResource(R.string.create_builtin_templates), pageTemplateGroup == 0) {
+                        pageTemplateGroup = 0; pageTemplateTag = ""
+                    }
+                    ModeChip(stringResource(R.string.create_imported_templates), pageTemplateGroup == 1) {
+                        pageTemplateGroup = 1; pageTemplateTag = ""
+                    }
                 }
+                CreationTemplateTagFilters(pageGroupTemplates, pageTemplateTag) { pageTemplateTag = it }
                 TemplateStrip(
-                    entries = pageTemplates.filter {
-                        if (pageTemplateGroup == 0) it.source == TemplateLibrary.Source.BUILT_IN || it.source == TemplateLibrary.Source.BUNDLED
-                        else it.source == TemplateLibrary.Source.IMPORTED || it.source == TemplateLibrary.Source.NOTE
-                    },
+                    entries = pageGroupTemplates.filter { templateMatchesTag(it, pageTemplateTag) },
                     selected = pagePattern,
                     pageMm = pageMm,
                     ink = pageTemplateStyle.patternColor ?: Rgba(70, 70, 70),
@@ -2455,14 +2467,16 @@ private fun NoteCreationDialog(
                     }
                     if (coverSourceTab == 0) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        ModeChip(stringResource(R.string.create_imported_templates), coverTemplateGroup == 1) { coverTemplateGroup = 1 }
-                        ModeChip(stringResource(R.string.create_builtin_templates), coverTemplateGroup == 0) { coverTemplateGroup = 0 }
+                        ModeChip(stringResource(R.string.create_imported_templates), coverTemplateGroup == 1) {
+                            coverTemplateGroup = 1; coverTemplateTag = ""
+                        }
+                        ModeChip(stringResource(R.string.create_builtin_templates), coverTemplateGroup == 0) {
+                            coverTemplateGroup = 0; coverTemplateTag = ""
+                        }
                     }
+                    CreationTemplateTagFilters(coverGroupTemplates, coverTemplateTag) { coverTemplateTag = it }
                     TemplateStrip(
-                        entries = coverTemplates.filter {
-                            if (coverTemplateGroup == 0) it.source == TemplateLibrary.Source.BUILT_IN || it.source == TemplateLibrary.Source.BUNDLED
-                            else it.source == TemplateLibrary.Source.IMPORTED || it.source == TemplateLibrary.Source.NOTE
-                        },
+                        entries = coverGroupTemplates.filter { templateMatchesTag(it, coverTemplateTag) },
                         selected = coverPattern,
                         pageMm = pageMm,
                         ink = coverTemplateStyle.patternColor ?: Rgba(245, 245, 245),

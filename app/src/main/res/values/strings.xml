@@ -396,6 +396,15 @@
     <string name="create_template_source">Templates</string>
     <string name="create_builtin_templates">Built-in</string>
     <string name="create_imported_templates">Imported</string>
+    <string name="create_tag_all">All</string>
+    <string name="create_tag_pages">Pages</string>
+    <string name="create_tag_lines">Lines</string>
+    <string name="create_tag_grid">Grid</string>
+    <string name="create_tag_dots">Dots</string>
+    <string name="create_tag_planner">Planner</string>
+    <string name="create_tag_writing">Writing</string>
+    <string name="create_tag_study">Study</string>
+    <string name="create_tag_untagged">Untagged</string>
     <string name="create_image_source">Images</string>
     <string name="create_template_settings">Template settings</string>
     <string name="create_template_ink_colour">Ink colour</string>

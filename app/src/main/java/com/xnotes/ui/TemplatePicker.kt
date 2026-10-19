@@ -286,6 +286,60 @@ internal fun CreationTemplateSettings(
     }
 }
 
+/** Consolidate synonymous .xtemplate tags while retaining less common user-defined categories. */
+internal fun canonicalTemplateTag(raw: String): String = when (raw.trim().lowercase()) {
+    "cover", "covers" -> "cover"
+    "page", "pages" -> "page"
+    "line", "lines", "lined", "ruled", "ruling" -> "lines"
+    "grid", "grids", "graph" -> "grid"
+    "dot", "dots", "dotted" -> "dots"
+    "plan", "planning", "planner", "planners" -> "planner"
+    "write", "writing" -> "writing"
+    "studies", "study" -> "study"
+    else -> raw.trim().lowercase()
+}
+
+internal fun templateMatchesTag(entry: TemplateLibrary.Entry, tag: String): Boolean =
+    tag.isBlank() || if (tag == "untagged") entry.template.tags.isEmpty()
+    else entry.template.tags.any { canonicalTemplateTag(it) == tag }
+
+/** Source-scoped tag filters, so users can jump to covers/ruled/grid/planner templates. */
+@Composable
+internal fun CreationTemplateTagFilters(
+    entries: List<TemplateLibrary.Entry>,
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
+    val available = entries.flatMap { it.template.tags }
+        .map(::canonicalTemplateTag).filter { it.isNotBlank() }.distinct()
+    val ordered = listOf("cover", "page", "lines", "grid", "dots", "planner", "writing", "study")
+        .filter { it in available } + (available - listOf("cover", "page", "lines", "grid", "dots", "planner", "writing", "study").toSet()).sorted()
+    val tags = ordered + if (entries.any { it.template.tags.isEmpty() }) listOf("untagged") else emptyList()
+    if (tags.isEmpty()) return
+    val titles = mapOf(
+        "cover" to stringResource(R.string.create_cover_tab),
+        "page" to stringResource(R.string.create_tag_pages),
+        "lines" to stringResource(R.string.create_tag_lines),
+        "grid" to stringResource(R.string.create_tag_grid),
+        "dots" to stringResource(R.string.create_tag_dots),
+        "planner" to stringResource(R.string.create_tag_planner),
+        "writing" to stringResource(R.string.create_tag_writing),
+        "study" to stringResource(R.string.create_tag_study),
+        "untagged" to stringResource(R.string.create_tag_untagged),
+    )
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        ModeChip(stringResource(R.string.create_tag_all), selected.isBlank()) { onSelect("") }
+        tags.forEach { tag ->
+            ModeChip(titles[tag] ?: tag.replaceFirstChar { it.uppercase() }, selected == tag) {
+                onSelect(tag)
+            }
+        }
+    }
+}
+
 /** Image-backed custom page/cover patterns, rendered as page-shaped thumbnails like template presets. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
