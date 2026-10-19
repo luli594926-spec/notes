@@ -242,6 +242,8 @@ data class NoteCreationOptions(
     val coverImageBytes: ByteArray? = null,
     /** Optional image used as the background paper on every page. */
     val pageImageBytes: ByteArray? = null,
+    /** Cover can use portrait geometry even when writing pages are landscape. */
+    val coverOrientation: Orientation = orientation,
 )
 
 @Stable
@@ -3290,6 +3292,9 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, S
                 }
             }
         }
+        // Explorer tile and Gallery must paint the stored .xtemplate, just like the
+        // open canvas and PDF export. Without this the cover is only its paper colour.
+        TemplateLibrary.paint(r, doc, page, cover, cover)
         if (page.pdfPage == null) MarkupPainter.paint(r, page.markups, doc.dpi / 72.0)
         // A closed note's flow is laid out locally (the published snapshot serves the open note only),
         // and only as far as this page, so a tile never sets the formulas further on.
@@ -3871,6 +3876,9 @@ class Editor(context: Context, val pane: Pane = Pane.PRIMARY) : ToolPopupHost, S
             }
             if (options.includeCover) {
                 val cover = blank.pages.first()
+                val (coverWidth, coverHeight) = options.pageSize.pixels(options.coverOrientation, blank.dpi)
+                cover.width = coverWidth
+                cover.height = coverHeight
                 cover.style = options.coverStyle
                 TemplateLibrary.embed(blank, options.coverStyle.template)
                 val title = com.xnotes.core.util.DocumentKind.stripSuffix(name).ifBlank { "Untitled" }

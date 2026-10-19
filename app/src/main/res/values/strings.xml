@@ -396,6 +396,17 @@
     <string name="create_template_source">Templates</string>
     <string name="create_builtin_templates">Built-in</string>
     <string name="create_imported_templates">Imported</string>
+    <string name="pref_template_organization">Template organization</string>
+    <string name="pref_template_organization_help">Choose which imported template tags to hide from Pages or Covers. Your library and template files are not modified. Tags are separated by commas.</string>
+    <string name="pref_template_separate">Separate imported templates by tags</string>
+    <string name="pref_template_pages_exclude">Hide from Pages</string>
+    <string name="pref_template_covers_exclude">Hide from Covers</string>
+    <string name="pref_template_tags_hint">e.g. cover, planner</string>
+    <string name="pref_template_no_tags">No template tags were found. Custom tags can still be entered.</string>
+    <string name="pref_template_add_tag">Add</string>
+    <string name="pref_template_shortcuts_help">Choose which tag filters appear during note creation. Other templates remain available under All.</string>
+    <string name="pref_template_pages_shortcuts">Page filter shortcuts</string>
+    <string name="pref_template_covers_shortcuts">Cover filter shortcuts</string>
     <string name="create_tag_all">All</string>
     <string name="create_tag_pages">Pages</string>
     <string name="create_tag_lines">Lines</string>
@@ -416,6 +427,7 @@
     <string name="create_cover_help">Adds a title page before the first writing page.</string>
     <string name="create_cover_colour">Cover colour</string>
     <string name="create_cover_pattern">Cover pattern</string>
+    <string name="create_cover_orientation">Cover orientation</string>
     <string name="new_note">New note</string>
     <string name="new_canvas">New canvas</string>
     <string name="about">About</string>

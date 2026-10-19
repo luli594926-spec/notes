@@ -2204,11 +2204,13 @@ private fun NoteCreationDialog(
     var pagePattern by remember {
         mutableStateOf(if (editor.noteCreationPageImageBytes != null) PageTemplates.NONE else savedTemplate ?: PageTemplates.NONE)
     }
+    // A preset inherited at dialog opening isn't a deliberate template selection.
+    var pageTemplatePicked by remember { mutableStateOf(false) }
     var coverColor by remember { mutableStateOf(Rgba(47, 62, 112)) }
     var coverImageBytes by remember { mutableStateOf(editor.noteCreationCoverImageBytes) }
     var coverPattern by remember { mutableStateOf(PageTemplates.NONE) }
+    var coverOrientation by remember { mutableStateOf(Orientation.PORTRAIT) }
     var pageColourPickerOpen by remember { mutableStateOf(false) }
-    var coverColourPickerOpen by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
     val pageColours = listOf(
         Rgba(255, 255, 255), Rgba(250, 247, 235), Rgba(231, 241, 255),
@@ -2234,13 +2236,16 @@ private fun NoteCreationDialog(
     val availableTemplates = TemplateLibrary.all()
     // Explicit cover/page tags keep imported designs in the appropriate creation tab.
     // Untagged templates remain usable in either context for backwards compatibility.
+    val separation = editor.preferences.creationTemplateTagSeparation
+    val pageExclusions = editor.preferences.creationPageExcludedTags.map(::canonicalTemplateTag).toSet()
+    val coverExclusions = editor.preferences.creationCoverExcludedTags.map(::canonicalTemplateTag).toSet()
     val pageTemplates = availableTemplates.filter { entry ->
-        entry.source != TemplateLibrary.Source.IMPORTED ||
-            entry.template.tags.none { it.equals("cover", ignoreCase = true) || it.equals("covers", ignoreCase = true) }
+        !separation || entry.source != TemplateLibrary.Source.IMPORTED ||
+            entry.template.tags.none { canonicalTemplateTag(it) in pageExclusions }
     }
     val coverTemplates = availableTemplates.filter { entry ->
-        entry.source != TemplateLibrary.Source.IMPORTED ||
-            entry.template.tags.none { it.equals("page", ignoreCase = true) || it.equals("pages", ignoreCase = true) }
+        !separation || entry.source != TemplateLibrary.Source.IMPORTED ||
+            entry.template.tags.none { canonicalTemplateTag(it) in coverExclusions }
     }
     val pageGroupTemplates = pageTemplates.filter {
         if (pageTemplateGroup == 0) it.source == TemplateLibrary.Source.BUILT_IN || it.source == TemplateLibrary.Source.BUNDLED
@@ -2270,6 +2275,7 @@ private fun NoteCreationDialog(
     var saveAsDefault by remember { mutableStateOf(false) }
     // The xtemplate renderer evaluates spacing and geometry in millimetres, not document pixels.
     val pageMm = remember(pageSize, orientation) { pageSize.millimetres(orientation) }
+    val coverMm = remember(pageSize, coverOrientation) { pageSize.millimetres(coverOrientation) }
     val confirm = {
         val name = text.text.trim()
         if (name.isNotEmpty()) {
@@ -2280,7 +2286,7 @@ private fun NoteCreationDialog(
                 if (coverImageBytes != null) PageTemplates.NONE else coverPattern, PageTemplates.NONE,
             ).copy(pageColor = coverColor, patternColor = coverTemplateStyle.patternColor ?: Rgba(255, 255, 255, 100))
             if (saveAsDefault) editor.saveNewNoteStyle(baseStyle)
-            onConfirm(name, NoteCreationOptions(pageSize, orientation, baseStyle, includeCover, coverStyle, coverImageBytes, pageImageBytes))
+            onConfirm(name, NoteCreationOptions(pageSize, orientation, baseStyle, includeCover, coverStyle, coverImageBytes, pageImageBytes, coverOrientation))
             editor.noteCreationCoverImageBytes = null
             editor.noteCreationPageImageBytes = null
         }
@@ -2358,11 +2364,7 @@ private fun NoteCreationDialog(
                     }
                 }
                 Text(stringResource(R.string.create_page_pattern), color = palette.textDim.toComposeColor(), fontSize = 12.sp)
-                ModeChip(stringResource(R.string.none), pagePattern == PageTemplates.NONE && pageImageBytes == null) {
-                    pagePattern = PageTemplates.NONE
-                    pageImageBytes = null
-                    editor.noteCreationPageImageBytes = null
-                }
+
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     ModeChip(stringResource(R.string.create_template_source), pageSourceTab == 0) { pageSourceTab = 0 }
                     ModeChip(stringResource(R.string.create_image_source), pageSourceTab == 1) { pageSourceTab = 1 }
@@ -2376,16 +2378,27 @@ private fun NoteCreationDialog(
                         pageTemplateGroup = 1; pageTemplateTag = ""
                     }
                 }
-                CreationTemplateTagFilters(pageGroupTemplates, pageTemplateTag) { pageTemplateTag = it }
+                CreationTemplateTagFilters(
+                    pageGroupTemplates,
+                    pageTemplateTag,
+                    editor.preferences.creationPageFilterTags,
+                ) { pageTemplateTag = it }
                 TemplateStrip(
                     entries = pageGroupTemplates.filter { templateMatchesTag(it, pageTemplateTag) },
                     selected = pagePattern,
+                    showClear = pageTemplatePicked,
+                        onClear = {
+                            pageTemplatePicked = false
+                            pagePattern = PageTemplates.NONE
+                            pageTemplateStyle = pageTemplateStyle.withTemplate(PageTemplates.NONE, PageTemplates.NONE)
+                        },
                     pageMm = pageMm,
                     ink = pageTemplateStyle.patternColor ?: Rgba(70, 70, 70),
                     accent = pageTemplateStyle.accentColor ?: PageStyle.DEFAULT_ACCENT_COLOR,
                     paper = pageColor ?: palette.paper,
                     selectedStyle = pageTemplateStyle,
                     onSelect = {
+                        pageTemplatePicked = true
                         pagePattern = it
                         pageImageBytes = null
                         editor.noteCreationPageImageBytes = null
@@ -2447,20 +2460,13 @@ private fun NoteCreationDialog(
                     }
                 }
                 if (includeCover) {
-                    Text(stringResource(R.string.create_cover_colour), color = palette.textDim.toComposeColor(), fontSize = 12.sp)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        coverColours.forEach { colour -> NoteCreationColour(colour, coverColor == colour) { coverColor = colour } }
-                        Box {
-                            ModeChip(stringResource(R.string.create_custom_colour), coverColor !in coverColours) { coverColourPickerOpen = true }
-                            if (coverColourPickerOpen) ColorPickerPopup(coverColor, editor.recentColors, { coverColourPickerOpen = false }) { coverColor = it }
-                        }
+                    Text(stringResource(R.string.create_cover_orientation), color = palette.textDim.toComposeColor(), fontSize = 12.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        ModeChip(stringResource(R.string.orientation_portrait), coverOrientation == Orientation.PORTRAIT) { coverOrientation = Orientation.PORTRAIT }
+                        ModeChip(stringResource(R.string.orientation_landscape), coverOrientation == Orientation.LANDSCAPE) { coverOrientation = Orientation.LANDSCAPE }
                     }
                     Text(stringResource(R.string.create_cover_pattern), color = palette.textDim.toComposeColor(), fontSize = 12.sp)
-                    ModeChip(stringResource(R.string.none), coverPattern == PageTemplates.NONE && coverImageBytes == null) {
-                        coverPattern = PageTemplates.NONE
-                        coverImageBytes = null
-                        editor.noteCreationCoverImageBytes = null
-                    }
+
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         ModeChip(stringResource(R.string.create_template_source), coverSourceTab == 0) { coverSourceTab = 0 }
                         ModeChip(stringResource(R.string.create_image_source), coverSourceTab == 1) { coverSourceTab = 1 }
@@ -2474,11 +2480,19 @@ private fun NoteCreationDialog(
                             coverTemplateGroup = 0; coverTemplateTag = ""
                         }
                     }
-                    CreationTemplateTagFilters(coverGroupTemplates, coverTemplateTag) { coverTemplateTag = it }
+                    CreationTemplateTagFilters(
+                        coverGroupTemplates,
+                        coverTemplateTag,
+                        editor.preferences.creationCoverFilterTags,
+                    ) { coverTemplateTag = it }
                     TemplateStrip(
                         entries = coverGroupTemplates.filter { templateMatchesTag(it, coverTemplateTag) },
                         selected = coverPattern,
-                        pageMm = pageMm,
+                        onClear = {
+                            coverPattern = PageTemplates.NONE
+                            coverTemplateStyle = coverTemplateStyle.withTemplate(PageTemplates.NONE, PageTemplates.NONE)
+                        },
+                        pageMm = coverMm,
                         ink = coverTemplateStyle.patternColor ?: Rgba(245, 245, 245),
                         accent = coverTemplateStyle.accentColor ?: Rgba(255, 190, 120),
                         paper = coverColor,
@@ -2496,11 +2510,14 @@ private fun NoteCreationDialog(
                     CreationTemplateSettings(
                         entry = availableTemplates.firstOrNull { it.key == coverPattern }.takeIf { coverImageBytes == null },
                         style = coverTemplateStyle,
-                        pageMm = pageMm,
+                        pageMm = coverMm,
                         ink = Rgba(245, 245, 245),
                         accent = Rgba(255, 190, 120),
                         paper = coverColor,
                         onChange = { coverTemplateStyle = it },
+                        coverColors = coverColours,
+                        onCoverColorChange = { coverColor = it },
+                        recentColors = editor.recentColors,
                     )
                     }
                     if (coverSourceTab == 1) {
@@ -2508,7 +2525,7 @@ private fun NoteCreationDialog(
                     CustomImageStrip(
                         images = customCoverImages,
                         selectedBytes = coverImageBytes,
-                        pageMm = pageMm,
+                        pageMm = coverMm,
                         paper = coverColor,
                         onSelect = { bytes ->
                             coverImageBytes = bytes
