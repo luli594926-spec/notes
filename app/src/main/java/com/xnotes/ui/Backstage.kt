@@ -2352,6 +2352,7 @@ private fun NoteCreationDialog(
                     ink = pageTemplateStyle.patternColor ?: Rgba(70, 70, 70),
                     accent = pageTemplateStyle.accentColor ?: PageStyle.DEFAULT_ACCENT_COLOR,
                     paper = pageColor ?: palette.paper,
+                    selectedStyle = pageTemplateStyle,
                     onSelect = {
                         pagePattern = it
                         pageImageBytes = null
@@ -2440,6 +2441,7 @@ private fun NoteCreationDialog(
                         ink = coverTemplateStyle.patternColor ?: Rgba(245, 245, 245),
                         accent = coverTemplateStyle.accentColor ?: Rgba(255, 190, 120),
                         paper = coverColor,
+                        selectedStyle = coverTemplateStyle,
                         onSelect = {
                             coverPattern = it
                             coverImageBytes = null

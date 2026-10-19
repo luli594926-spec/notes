@@ -94,6 +94,7 @@ internal fun TemplateStrip(
     ink: Rgba,
     accent: Rgba,
     paper: Rgba,
+    selectedStyle: PageStyle? = null,
     onSelect: (String) -> Unit,
     onImport: () -> Unit,
     onRemove: (String) -> Unit,
@@ -139,7 +140,18 @@ internal fun TemplateStrip(
                         .border(if (sel) 2.dp else 1.dp, (if (sel) palette.accent else palette.border).toComposeColor(), RoundedCornerShape(3.dp))
                         .padding(if (sel) 2.dp else 1.dp),
                 ) {
-                    val bmp = rememberTemplateThumb(e.template, TemplateThumbs.spec(e.key, pageMm, ink, accent, paper, TemplateValues.DEFAULTS, wPx), keep = true)
+                    // Use the selected template's custom colour/number parameters too.
+                    // Other tiles remain generic previews of their own defaults.
+                    val values = if (sel && selectedStyle != null) {
+                        val numbers = HashMap(selectedStyle.params ?: emptyMap())
+                        e.template.spacingParam?.let { spacing ->
+                            selectedStyle.spacing?.let {
+                                numbers[spacing.name] = it * 25.4 / com.xnotes.core.model.PageSize.DEFAULT_DPI
+                            }
+                        }
+                        TemplateValues(numbers, selectedStyle.colors ?: emptyMap())
+                    } else TemplateValues.DEFAULTS
+                    val bmp = rememberTemplateThumb(e.template, TemplateThumbs.spec(e.key, pageMm, ink, accent, paper, values, wPx), keep = true)
                     if (bmp != null) Image(bmp, contentDescription = e.template.name, Modifier.size(THUMB_W, thumbH))
                 }
                 Spacer(Modifier.height(3.dp))
