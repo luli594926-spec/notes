@@ -396,6 +396,7 @@
     <string name="create_template_source">Templates</string>
     <string name="create_image_source">Images</string>
     <string name="create_template_settings">Template settings</string>
+    <string name="create_template_ink_colour">Ink colour</string>
     <string name="create_orientation">Orientation</string>
     <string name="create_page_appearance">Page appearance</string>
     <string name="create_paper_colour">Paper colour</string>

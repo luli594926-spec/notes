@@ -2255,7 +2255,7 @@ private fun NoteCreationDialog(
                 .copy(pageColor = pageColor)
             val coverStyle = coverTemplateStyle.withTemplate(
                 if (coverImageBytes != null) PageTemplates.NONE else coverPattern, PageTemplates.NONE,
-            ).copy(pageColor = coverColor, patternColor = Rgba(255, 255, 255, 100))
+            ).copy(pageColor = coverColor, patternColor = coverTemplateStyle.patternColor ?: Rgba(255, 255, 255, 100))
             if (saveAsDefault) editor.saveNewNoteStyle(baseStyle)
             onConfirm(name, NoteCreationOptions(pageSize, orientation, baseStyle, includeCover, coverStyle, coverImageBytes, pageImageBytes))
             editor.noteCreationCoverImageBytes = null

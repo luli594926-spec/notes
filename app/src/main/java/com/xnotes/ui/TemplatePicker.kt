@@ -196,6 +196,8 @@ internal fun CreationTemplateSettings(
     val palette = LocalPalette.current
     val template = entry.template
     var customizing by remember(entry.key) { mutableStateOf(false) }
+    var inkPickerOpen by remember { mutableStateOf(false) }
+    var accentPickerOpen by remember { mutableStateOf(false) }
     val numbers = HashMap(style.params ?: emptyMap())
     template.spacingParam?.let { spacing ->
         style.spacing?.let { numbers[spacing.name] = it * 25.4 / com.xnotes.core.model.PageSize.DEFAULT_DPI }
@@ -229,19 +231,46 @@ internal fun CreationTemplateSettings(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            if (template.params.isNotEmpty()) {
-                ModeChip(stringResource(R.string.create_template_settings), customizing) {
-                    customizing = !customizing
-                }
+            ModeChip(stringResource(R.string.create_template_settings), customizing) {
+                customizing = !customizing
             }
         }
     }
-    if (customizing && template.params.isNotEmpty()) {
-        TemplateParamControls(
-            template, style, lower = null,
-            dpi = com.xnotes.core.model.PageSize.DEFAULT_DPI,
-            apply = onChange,
-        )
+    if (customizing) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box {
+                ModeChip(stringResource(R.string.create_template_ink_colour), inkPickerOpen) {
+                    inkPickerOpen = true
+                    accentPickerOpen = false
+                }
+                if (inkPickerOpen) {
+                    ColorPickerPopup(previewInk, emptyList(), { inkPickerOpen = false }) { color ->
+                        onChange(style.copy(patternColor = color))
+                    }
+                }
+            }
+            Box {
+                ModeChip(stringResource(R.string.caption_accent_colour), accentPickerOpen) {
+                    accentPickerOpen = true
+                    inkPickerOpen = false
+                }
+                if (accentPickerOpen) {
+                    ColorPickerPopup(previewAccent, emptyList(), { accentPickerOpen = false }) { color ->
+                        onChange(style.copy(accentColor = color))
+                    }
+                }
+            }
+        }
+        if (template.params.isNotEmpty()) {
+            TemplateParamControls(
+                template, style, lower = null,
+                dpi = com.xnotes.core.model.PageSize.DEFAULT_DPI,
+                apply = onChange,
+            )
+        }
     }
 }
 
